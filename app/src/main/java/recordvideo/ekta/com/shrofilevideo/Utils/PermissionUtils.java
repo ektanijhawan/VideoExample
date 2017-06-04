@@ -1,4 +1,4 @@
-package recordvideo.ekta.com.shrofilevideo;
+package recordvideo.ekta.com.shrofilevideo.Utils;
 
 import android.app.Activity;
 import android.content.Context;

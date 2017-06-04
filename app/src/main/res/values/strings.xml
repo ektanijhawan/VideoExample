@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">ShrofileVideo</string>
+    <string name="title_activity_media_player">MediaPlayerActivity</string>
+    <string name="title_activity_media_player_new">MediaPlayerNewActivity</string>
+    <string name="title_activity_intro">IntroActivity</string>
+    <string name="make_a_video">Make a video</string>
+    <string name="record">RECORD</string>
+    <string name="crop">Crop</string>
+    <string name="compress">Compress</string>
+    <string name="go_to_media_player">Go to Media Player</string>
+    <string name="cropping_may_take_a_while">Cropping may take a while.!</string>
+    <string name="sucess_crop">Successfully cropped</string>
+    <string name="success_compressed">Successfully compressed</string>
 </resources>

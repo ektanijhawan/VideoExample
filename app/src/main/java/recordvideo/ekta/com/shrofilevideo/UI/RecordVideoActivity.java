@@ -1,66 +1,60 @@
-package recordvideo.ekta.com.shrofilevideo;
+package recordvideo.ekta.com.shrofilevideo.UI;
 
-import android.Manifest;
-import android.app.ActionBar;
-import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
-import android.content.pm.PackageManager;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Bundle;
+
 import android.os.Environment;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-
-import static android.Manifest.permission.CAMERA;
-import static android.Manifest.permission.CAPTURE_VIDEO_OUTPUT;
-import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
-import static android.Manifest.permission.READ_PHONE_STATE;
-import static android.Manifest.permission.READ_SMS;
-import static android.Manifest.permission.RECORD_AUDIO;
-import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
-import static recordvideo.ekta.com.shrofilevideo.Constants.CAMERA_PERMISSION;
-import static recordvideo.ekta.com.shrofilevideo.Constants.READ_EXTERNAL_PERMISSION;
-import static recordvideo.ekta.com.shrofilevideo.Constants.RECORD_AUDIO_PERMISSION;
-import static recordvideo.ekta.com.shrofilevideo.Constants.RECORD_VIDEO_PERMISSION;
-import static recordvideo.ekta.com.shrofilevideo.Constants.WRITE_EXTERNAL_PERMISSION;
-
-import android.view.ViewGroup.LayoutParams;
-
-import com.amazonaws.auth.CognitoCachingCredentialsProvider;
-import com.amazonaws.regions.Regions;
 import com.github.hiteshsondhi88.libffmpeg.ExecuteBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.FFmpeg;
 import com.github.hiteshsondhi88.libffmpeg.LoadBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegCommandAlreadyRunningException;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegNotSupportedException;
 
-public class MainActivity extends AppCompatActivity {
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+
+import recordvideo.ekta.com.shrofilevideo.R;
+import recordvideo.ekta.com.shrofilevideo.Utils.PermissionUtils;
+
+import static android.Manifest.permission.CAMERA;
+import static android.Manifest.permission.CAPTURE_VIDEO_OUTPUT;
+import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
+import static android.Manifest.permission.RECORD_AUDIO;
+import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
+import static recordvideo.ekta.com.shrofilevideo.Utils.Constants.CAMERA_PERMISSION;
+import static recordvideo.ekta.com.shrofilevideo.Utils.Constants.READ_EXTERNAL_PERMISSION;
+import static recordvideo.ekta.com.shrofilevideo.Utils.Constants.RECORD_AUDIO_PERMISSION;
+import static recordvideo.ekta.com.shrofilevideo.Utils.Constants.RECORD_VIDEO_PERMISSION;
+import static recordvideo.ekta.com.shrofilevideo.Utils.Constants.WRITE_EXTERNAL_PERMISSION;
+
+public class RecordVideoActivity extends AppCompatActivity {
+
+
+
     private Camera myCamera;
-    private MyCameraSurfaceView myCameraSurfaceView;
+    private RecordVideoActivity.MyCameraSurfaceView myCameraSurfaceView;
     private MediaRecorder mediaRecorder;
     Camera.Parameters params;
     Button myButton;
@@ -68,10 +62,10 @@ public class MainActivity extends AppCompatActivity {
     private Camera mCamera;
     int width;
     int height;
-    SurfaceHolder surfaceHolder;
     boolean recording;
     static SurfaceHolder holder;
     Camera.Parameters parameters;
+    boolean compress = false;
     List<Camera.Size> previewSizes;
     FrameLayout myCameraPreview;
     RelativeLayout mHideView;
@@ -87,12 +81,18 @@ public class MainActivity extends AppCompatActivity {
     File cropfile;
     FFmpeg ffmpeg;
     String[] cmd;
-    CognitoCachingCredentialsProvider credentialsProvider;
+    Button compressButton;
+    String[] complexCommand;
+    String compressed;
+    Button mediaPlayer;
+    String[] permissions;
+//    CognitoCachingCredentialsProvider credentialsProvider;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        progressDialog=new ProgressDialog(this);
+        setContentView(R.layout.activity_record_video);
+        progressDialog = new ProgressDialog(this);
         getSupportActionBar();
         recording = false;
         displayMetrics = new DisplayMetrics();
@@ -105,18 +105,30 @@ public class MainActivity extends AppCompatActivity {
 //                "us-east-2:98172123-1722-4cc0-b626-bfe06d735f50", // Identity Pool ID
 //                Regions.US_EAST_2 // Region
 //        );
+        // Create a record in a dataset and synchronize with the server
+//        Dataset dataset = syncClient.openOrCreateDataset("myDataset");
+//        dataset.put("myKey", "myValue");
+//        dataset.synchronize(new DefaultSyncCallback() {
+//            @Override
+//            public void onSuccess(Dataset dataset, List newRecords) {
+//                //Your handler code here
+//            }
+//        });
         in = Environment.getExternalStorageDirectory().getAbsolutePath() + "/myvideo.mp4";
         out = Environment.getExternalStorageDirectory().getAbsolutePath() + "/myvideocropped.mp4";
-        cmd = new String[]{"-y", "-i", in, "-vf", "crop=" + width1 + ":" + width1+ ":" + 0 + ":" + 0, "-c:a", "copy", out};
+        compressed = Environment.getExternalStorageDirectory().getAbsolutePath() + "/compressed.mp4";
+        complexCommand = new String[]{"-y", "-i", out, "-s", width1 + "x" + width1, "-r", "25", "-vcodec", "mpeg4", "-b:v", "150k", "-b:a", "48000", "-ac", "2", "-ar", "22050", compressed};
 
-        String[] permissions = new String[]{CAMERA, RECORD_AUDIO, WRITE_EXTERNAL_STORAGE, CAPTURE_VIDEO_OUTPUT, READ_EXTERNAL_STORAGE};
-        if (!PermissionUtils.checkPermission(MainActivity.this, CAMERA) && !PermissionUtils.checkPermission(MainActivity.this, RECORD_AUDIO) && !PermissionUtils.checkPermission(MainActivity.this, READ_EXTERNAL_STORAGE)) {
+        cmd = new String[]{"-y", "-i", in, "-vf", "crop=" + width1 + ":" + width1 + ":" + width1 + ":" + width1, "-c:a", "copy", out};
+
+        permissions = new String[]{CAMERA, RECORD_AUDIO, WRITE_EXTERNAL_STORAGE, CAPTURE_VIDEO_OUTPUT, READ_EXTERNAL_STORAGE};
+        if (!PermissionUtils.checkPermission(RecordVideoActivity.this, CAMERA) && !PermissionUtils.checkPermission(RecordVideoActivity.this, RECORD_AUDIO) && !PermissionUtils.checkPermission(RecordVideoActivity.this, READ_EXTERNAL_STORAGE)) {
             PermissionUtils.requestPermissions(this, CAMERA_PERMISSION, permissions);
         } else {
 
             //Get Camera for preview
             if (myCamera == null) {
-                Toast.makeText(MainActivity.this,
+                Toast.makeText(RecordVideoActivity.this,
                         "Fail to get Camera",
                         Toast.LENGTH_LONG).show();
             }
@@ -126,20 +138,10 @@ public class MainActivity extends AppCompatActivity {
             actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data, getResources().getDisplayMetrics());
         }
 
-        myCameraSurfaceView = new MyCameraSurfaceView(this, myCamera);
+        myCameraSurfaceView = new RecordVideoActivity.MyCameraSurfaceView(this, myCamera);
         myCameraPreview = (FrameLayout) findViewById(R.id.videoview);
         mHideView = (RelativeLayout) findViewById(R.id.hideView);
-//        ViewTreeObserver vto = myCameraPreview.getViewTreeObserver();
-//        vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-//            @Override
-//            public void onGlobalLayout() {
-//                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
-//                    myCameraPreview.getViewTreeObserver().removeGlobalOnLayoutListener(this);
-//                } else {
-//                    myCameraPreview.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-//                }
-//              width=  myCameraPreview.getWidth();
-//                height=myCameraPreview.getHeight();
+
         ViewTreeObserver vto = myCameraPreview.getViewTreeObserver();
         vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
@@ -160,48 +162,46 @@ public class MainActivity extends AppCompatActivity {
         if (resourceId > 0) {
             resheight = resources.getDimensionPixelSize(resourceId);
         }
-                /*
-                    public abstract int getHeight ()
-                        Retrieve the current height of the ActionBar.
 
-                        Returns
-                            The ActionBar's height
-                */
-        // Get the ActionBar height in pixels
-        // You can convert this pixels value to dp unit
-//                height=myCameraPreview.getMeasuredHeight();
-//                width = myCameraPreview.getMeasuredWidth();
-//                myCameraPreview.setMini
-// mumHeight(height);
-//                myCameraPreview.setLayoutParams(new RelativeLayout.LayoutParams(width, width));
-//                 height = myCameraPreview.getMeasuredHeight();
-
-//            }
-//        });
         myCameraPreview.addView(myCameraSurfaceView);
-//        myCameraPreview.setMinimumHeight(width1);
 
         myButton = (Button) findViewById(R.id.mybutton);
         cropButton = (Button) findViewById(R.id.cropButton);
-//        myButton.setHeight(height1 - width1 + actionBarHeight);
+        compressButton = (Button) findViewById(R.id.compressButton);
+        mediaPlayer= (Button) findViewById(R.id.mediaButton);
         a = height1 - width1;
-//        mHideView.setMinimumHeight(height1+actionBarHeight-width1);
         mHideView.setMinimumHeight(a);
 
         ffmpegLoad();
         myButton.setOnClickListener(myButtonOnClickListener);
-//        prepareMediaRecorder();
+
         cropButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
                     cropfile = new File(out);
-
-//                    cropfile.createNewFile();
                     execFFmpegCommand(cmd);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+            }
+        });
+        compressButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                cropButton.setOnClickListener(null);
+                compress = true;
+                execFFmpegCommand(complexCommand);
+            }
+        });
+        mediaPlayer.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                compressButton.setOnClickListener(null);
+                Intent intent = new Intent(RecordVideoActivity.this,MediaPlayerActivity.class);
+                intent.putExtra("width",width1);
+                intent.putExtra("mediaUri",compressed);
+                startActivity(intent);
             }
         });
     }
@@ -211,31 +211,22 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onClick(View v) {
-//            mediaRecorder = new MediaRecorder();
 
-            // TODO Auto-generated method stub
+
             if (recording) {
                 // stop recording and release camera
                 mediaRecorder.stop();  // stop the recording
                 releaseMediaRecorder(); // release the MediaRecorder object
                 cropButton.setVisibility(View.VISIBLE);
+                Toast.makeText(RecordVideoActivity.this, "Successfully saved.!", Toast.LENGTH_SHORT).show();
+                myButton.setOnClickListener(null);
 
-                Toast.makeText(MainActivity.this,"Successfully saved.!",Toast.LENGTH_SHORT).show();
-
-                //Exit after saved
-//                finish();
-//                ffmpegLoad();
-//                finish();
             } else {
 
-                //Release Camera before MediaRecorder start
-//                releaseCamera();
-
                 if (!prepareMediaRecorder()) {
-                    Toast.makeText(MainActivity.this,
+                    Toast.makeText(RecordVideoActivity.this,
                             "Fail in prepareMediaRecorder()!\n - Ended -",
                             Toast.LENGTH_LONG).show();
-//                    finish();
                 }
 
                 mediaRecorder.start();
@@ -247,11 +238,10 @@ public class MainActivity extends AppCompatActivity {
     };
 
     private Camera getCameraInstance() {
-// TODO Auto-generated method stub
         Camera c = null;
         try {
             c = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
-            c.setDisplayOrientation(90);// attempt to get a Camera instance
+            c.setDisplayOrientation(90);
             params = c.getParameters();
 
         } catch (Exception e) {
@@ -269,18 +259,14 @@ public class MainActivity extends AppCompatActivity {
         myCamera = getCameraInstance();
 
         mediaRecorder = new MediaRecorder();
-//        mediaRecorder.setVideoSize(width1,width1);
-
+        mediaRecorder.setOrientationHint(90);
         myCamera.unlock();
-//        params.setPictureSize(width, width);
-//        myCamera.setParameters(params);
+
         mediaRecorder.setCamera(myCamera);
-//mediaRecorder.setVideoSize(width1,width1);
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
 
         mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
-//        mediaRecorder.setProfile(profile);
 
         File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/myvideo.mp4");
         try {
@@ -289,19 +275,10 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
-        mediaRecorder.setOutputFile(Environment.getExternalStorageDirectory().getAbsolutePath() + "/myvideo.mp4");
+        mediaRecorder.setOutputFile(in);
         mediaRecorder.setMaxDuration(60000); // Set max duration 60 sec.
-//        mediaRecorder.setMaxFileSize(10000000);
-//        mediaRecorder.setVideoSize(width,height);
-//        mediaRecorder.setCaptureRate();
-
-
-        // Set max file size 5M
 
         mediaRecorder.setPreviewDisplay(myCameraSurfaceView.getHolder().getSurface());
-        mediaRecorder.setOrientationHint(90);
-
-
         try {
             mediaRecorder.prepare();
         } catch (IllegalStateException e) {
@@ -339,30 +316,33 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public class MyCameraSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
+public class MyCameraSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
 
 
-        public MyCameraSurfaceView(Context context, Camera camera) {
-            super(context);
-            mCamera = camera;
+    public MyCameraSurfaceView(Context context, Camera camera) {
+        super(context);
+        mCamera = camera;
 
-            // Install a SurfaceHolder.Callback so we get notified when the
-            // underlying surface is created and destroyed.
-            mHolder = getHolder();
-            mHolder.addCallback(this);
-            // deprecated setting, but required on Android versions prior to 3.0
-            mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        // Install a SurfaceHolder.Callback so we get notified when the
+        // underlying surface is created and destroyed.
+        mHolder = getHolder();
+        mHolder.addCallback(this);
+        // deprecated setting, but required on Android versions prior to 3.0
+        mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int weight,
+                               int height) {
+        if (!PermissionUtils.checkPermission(RecordVideoActivity.this, CAMERA) && !PermissionUtils.checkPermission(RecordVideoActivity.this, RECORD_AUDIO) && !PermissionUtils.checkPermission(RecordVideoActivity.this, READ_EXTERNAL_STORAGE)) {
+            PermissionUtils.requestPermissions(this, CAMERA_PERMISSION, permissions);
         }
-
-        @Override
-        public void surfaceChanged(SurfaceHolder holder, int format, int weight,
-                                   int height) {
+        else {
             parameters = mCamera.getParameters();
             previewSizes = parameters.getSupportedPreviewSizes();
 //            Camera.Size previewSize ;
             parameters.setPreviewSize(width1, width1);
 
-//                    parameters.setPreviewSize(previewSize.width, previewSize.height);
             // If your preview can change or rotate, take care of those events here.
             // Make sure to stop the preview before resizing or reformatting it.
 
@@ -388,40 +368,38 @@ public class MainActivity extends AppCompatActivity {
 
                 mCamera.startPreview();
 
+
             } catch (Exception e) {
             }
         }
+    }
 
 
-        @Override
-        public void surfaceCreated(SurfaceHolder holder) {
-            // TODO Auto-generated method stub
-            MainActivity.holder = holder;
-            // The Surface has been created, now tell the camera where to draw the preview.
-            try {
-                String[] permissions = new String[]{CAMERA, RECORD_AUDIO, WRITE_EXTERNAL_STORAGE, CAPTURE_VIDEO_OUTPUT, READ_EXTERNAL_STORAGE};
-                if (!PermissionUtils.checkPermission(MainActivity.this, CAMERA) && !PermissionUtils.checkPermission(MainActivity.this, WRITE_EXTERNAL_STORAGE) && !PermissionUtils.checkPermission(MainActivity.this, RECORD_AUDIO) && !PermissionUtils.checkPermission(MainActivity.this, CAPTURE_VIDEO_OUTPUT) && !PermissionUtils.checkPermission(MainActivity.this, READ_EXTERNAL_STORAGE))
-                    PermissionUtils.requestPermissions(this, CAMERA_PERMISSION, permissions);
-                else {
-                    mCamera.setPreviewDisplay(MainActivity.holder);
-                    mCamera.startPreview();
-                }
-            } catch (IOException e) {
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        RecordVideoActivity.holder = holder;
+        // The Surface has been created, now tell the camera where to draw the preview.
+        try {
+            if (!PermissionUtils.checkPermission(RecordVideoActivity.this, CAMERA) && !PermissionUtils.checkPermission(RecordVideoActivity.this, WRITE_EXTERNAL_STORAGE) && !PermissionUtils.checkPermission(RecordVideoActivity.this, RECORD_AUDIO) && !PermissionUtils.checkPermission(RecordVideoActivity.this, CAPTURE_VIDEO_OUTPUT) && !PermissionUtils.checkPermission(RecordVideoActivity.this, READ_EXTERNAL_STORAGE))
+                PermissionUtils.requestPermissions(this, CAMERA_PERMISSION, permissions);
+            else {
+                mCamera.setPreviewDisplay(RecordVideoActivity.holder);
+                mCamera.startPreview();
             }
+        } catch (IOException e) {
         }
-
-        @Override
-        public void surfaceDestroyed(SurfaceHolder holder) {
-            // TODO Auto-generated method stub
-
-        }
-
     }
 
     @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        // TODO Auto-generated method stub
+
+    }
+
+}
+
+    @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-//        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        int x = 0;
 
         switch (requestCode) {
             case CAMERA_PERMISSION:
@@ -431,13 +409,14 @@ public class MainActivity extends AppCompatActivity {
             case READ_EXTERNAL_PERMISSION:
                 try {
 
-                    mCamera.setPreviewDisplay(MainActivity.holder);
+                    mCamera.setPreviewDisplay(RecordVideoActivity.holder);
                     mCamera.startPreview();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
 
         }
+
 
 
     }
@@ -449,8 +428,6 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onStart() {
-//                    execFFmpegCommand(cmd);
-
                     Log.v("ffmpeg", "start");
 
 
@@ -500,7 +477,11 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onProgress(String message) {
-                    progressDialog.setMessage("Cropping");
+                    if (!compress)
+                        progressDialog.setMessage(getString(R.string.cropping_may_take_a_while));
+                    else
+                        progressDialog.setMessage("Compressing");
+
                     progressDialog.show();
                     Log.v("ffmpegcrop", "progress");
 
@@ -521,9 +502,15 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onFinish() {
-                    Toast.makeText(MainActivity.this,"Successfully cropped",Toast.LENGTH_SHORT).show();
+                    if (!compress) {
+                        Toast.makeText(RecordVideoActivity.this, R.string.sucess_crop, Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(RecordVideoActivity.this, R.string.success_compressed, Toast.LENGTH_SHORT).show();
+                        mediaPlayer.setVisibility(View.VISIBLE);
+                    }
                     progressDialog.dismiss();
                     Log.v("ffmpegcrop", "finish");
+                    compressButton.setVisibility(View.VISIBLE);
 
                 }
             });
@@ -532,5 +519,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
 }
+
 
